@@ -1,0 +1,195 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Play the classic Snake game online with multiple difficulties, dark arcade aesthetics, touch controls, and high scores.">
+    <title>Retro Snake Arena - Play Online</title>
+    <link rel="stylesheet" href="{% static 'website/css/style.css' %}">
+</head>
+<body>
+    <!-- Hidden CSRF form to easily retrieve CSRF token in JS -->
+    <form id="csrf-token-form" style="display: none;">
+        {% csrf_token %}
+    </form>
+
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="game-header">
+            <div class="logo-group">
+                <span class="game-badge">ARCADE</span>
+                <h1 class="game-title">SNAKE <span class="highlight">ARENA</span></h1>
+            </div>
+            <p class="game-tagline">Navigate the grid, collect food, and climb the leaderboard.</p>
+        </header>
+
+        <!-- Main Game Layout -->
+        <main class="game-main-layout">
+            <!-- Left / Center Section: Game Screen and Controls -->
+            <section class="game-column" aria-label="Game Arena">
+                <!-- Stats Header -->
+                <div class="stats-bar">
+                    <div class="stat-card">
+                        <span class="stat-label">SCORE</span>
+                        <span id="current-score" class="stat-value">0</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <span class="stat-label">BEST (<span id="best-difficulty-label">MED</span>)</span>
+                        <span id="personal-best" class="stat-value">0</span>
+                    </div>
+
+                    <div class="difficulty-picker" role="group" aria-label="Difficulty selection">
+                        <span class="difficulty-label">DIFFICULTY</span>
+                        <div class="difficulty-buttons">
+                            <button type="button" class="diff-btn" data-difficulty="easy" id="diff-easy-btn" title="Easy Speed (160ms)">Easy</button>
+                            <button type="button" class="diff-btn active" data-difficulty="medium" id="diff-medium-btn" title="Medium Speed (110ms)">Medium</button>
+                            <button type="button" class="diff-btn" data-difficulty="hard" id="diff-hard-btn" title="Hard Speed (70ms)">Hard</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canvas Wrapper with Overlays -->
+                <div class="canvas-wrapper">
+                    <canvas id="game-canvas" width="400" height="400" tabindex="0" aria-label="Snake Game Grid" role="img"></canvas>
+
+                    <!-- Start Overlay -->
+                    <div id="start-overlay" class="game-overlay active">
+                        <div class="overlay-content">
+                            <div class="overlay-icon">🐍</div>
+                            <h2 class="overlay-title">Ready to Hunt?</h2>
+                            <p class="overlay-desc">Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to slither. Hit food, avoid walls & your tail!</p>
+                            <button type="button" id="start-game-btn" class="btn btn-primary btn-lg">Start Game</button>
+                        </div>
+                    </div>
+
+                    <!-- Pause Overlay -->
+                    <div id="pause-overlay" class="game-overlay hidden">
+                        <div class="overlay-content">
+                            <div class="overlay-icon">⏸️</div>
+                            <h2 class="overlay-title">Game Paused</h2>
+                            <p class="overlay-desc">Catch your breath. Press Resume or Space to continue.</p>
+                            <button type="button" id="resume-btn" class="btn btn-primary">Resume</button>
+                        </div>
+                    </div>
+
+                    <!-- Game Over / Victory Modal -->
+                    <div id="game-over-overlay" class="game-overlay hidden">
+                        <div class="overlay-content">
+                            <div id="game-over-icon" class="overlay-icon">💀</div>
+                            <h2 id="game-over-title" class="overlay-title">Game Over!</h2>
+                            <div class="final-score-box">
+                                <span class="final-score-label">Final Score</span>
+                                <span id="final-score-val" class="final-score-val">0</span>
+                                <span id="final-difficulty-badge" class="badge">MEDIUM</span>
+                            </div>
+
+                            <!-- Score Submission Section -->
+                            <div id="score-submission-container" class="submission-container">
+                                <p class="submission-note">Submit your score to the global leaderboard:</p>
+                                <form id="score-form" class="score-form" onsubmit="return false;">
+                                    <div class="form-row">
+                                        <label for="player-name-input" class="visually-hidden">Player Name</label>
+                                        <input
+                                            type="text"
+                                            id="player-name-input"
+                                            placeholder="Enter your name (1-30 chars)"
+                                            maxlength="30"
+                                            autocomplete="name"
+                                            required
+                                        >
+                                        <button type="button" id="submit-score-btn" class="btn btn-accent">Submit</button>
+                                    </div>
+                                    <p id="submission-message" class="submission-message" aria-live="polite"></p>
+                                </form>
+                                <p class="cheat-disclaimer">Note: Browser scores are tracked for friendly competition and are not cheat-proof.</p>
+                            </div>
+
+                            <div class="game-over-actions">
+                                <button type="button" id="play-again-btn" class="btn btn-primary">Play Again</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Primary Game Action Buttons -->
+                <div class="action-bar">
+                    <button type="button" id="toggle-pause-btn" class="btn btn-control" disabled>
+                        <span class="btn-icon">⏸</span>
+                        <span id="toggle-pause-text">Pause</span>
+                    </button>
+                    <button type="button" id="restart-btn" class="btn btn-control">
+                        <span class="btn-icon">🔄</span>
+                        <span>Restart</span>
+                    </button>
+                </div>
+
+                <!-- Mobile Touch D-Pad Controls -->
+                <div class="dpad-wrapper" aria-label="Mobile Touch Directional Controls">
+                    <p class="dpad-title">Touch Controls</p>
+                    <div class="dpad-grid">
+                        <div class="dpad-cell"></div>
+                        <button type="button" id="btn-up" class="dpad-btn dpad-up" aria-label="Move Up">▲</button>
+                        <div class="dpad-cell"></div>
+                        <button type="button" id="btn-left" class="dpad-btn dpad-left" aria-label="Move Left">◀</button>
+                        <button type="button" id="btn-down" class="dpad-btn dpad-down" aria-label="Move Down">▼</button>
+                        <button type="button" id="btn-right" class="dpad-btn dpad-right" aria-label="Move Right">▶</button>
+                    </div>
+                </div>
+
+                <!-- Controls Guide -->
+                <div class="instructions-card">
+                    <h3 class="instructions-heading">Keyboard Shortcuts</h3>
+                    <div class="keys-grid">
+                        <div class="key-item"><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or <kbd>↑</kbd> <kbd>←</kbd> <kbd>↓</kbd> <kbd>→</kbd> <span>Move</span></div>
+                        <div class="key-item"><kbd>Space</kbd> <span>Pause / Resume</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Section: Leaderboard -->
+            <aside class="leaderboard-column" aria-label="Top Scores Leaderboard">
+                <div class="leaderboard-card">
+                    <div class="leaderboard-header">
+                        <div class="leaderboard-title-group">
+                            <span class="trophy-icon">🏆</span>
+                            <h2 class="leaderboard-title">Hall of Fame</h2>
+                        </div>
+                        <button type="button" id="refresh-leaderboard-btn" class="btn-icon-only" title="Refresh Leaderboard" aria-label="Refresh Leaderboard">🔄</button>
+                    </div>
+
+                    <!-- Leaderboard Difficulty Tabs -->
+                    <div class="leaderboard-tabs" role="tablist" aria-label="Leaderboard difficulty tabs">
+                        <button type="button" class="tab-btn" data-tab="easy" role="tab" id="tab-easy">Easy</button>
+                        <button type="button" class="tab-btn active" data-tab="medium" role="tab" id="tab-medium" aria-selected="true">Medium</button>
+                        <button type="button" class="tab-btn" data-tab="hard" role="tab" id="tab-hard">Hard</button>
+                    </div>
+
+                    <!-- Scores Table Container -->
+                    <div class="leaderboard-content" id="leaderboard-content" aria-live="polite">
+                        <div class="leaderboard-loader" id="leaderboard-loader">Loading top scores...</div>
+                        <ol class="leaderboard-list" id="leaderboard-list"></ol>
+                        <div class="leaderboard-empty hidden" id="leaderboard-empty">
+                            No scores recorded yet for this difficulty. Be the first champion!
+                        </div>
+                    </div>
+
+                    <div class="leaderboard-footer">
+                        <span class="info-icon">ℹ️</span>
+                        <span>Scores are updated live upon game completion.</span>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Footer -->
+        <footer class="game-footer">
+            <p>Built with Django & Vanilla JavaScript Canvas. Responsive, keyboard-accessible, and standalone.</p>
+        </footer>
+    </div>
+
+    <!-- Game Scripts -->
+    <script src="{% static 'website/js/script.js' %}"></script>
+</body>
+</html>
