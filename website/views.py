@@ -88,7 +88,7 @@ def submit_score(request):
         )
     except Exception as e:
         return JsonResponse(
-            {'status': 'error', 'message': 'Failed to save score to database.'},
+            {'status': 'error', 'message': f'Failed to save score to database: {str(e)}'},
             status=500
         )
 
@@ -107,8 +107,11 @@ def get_leaderboard(request):
             status=400
         )
 
-    top_scores = GameScore.objects.filter(difficulty=difficulty).order_by('-score', 'created_at')[:10]
-    leaderboard_data = [score.to_dict() for score in top_scores]
+    try:
+        top_scores = GameScore.objects.filter(difficulty=difficulty).order_by('-score', 'created_at')[:10]
+        leaderboard_data = [score.to_dict() for score in top_scores]
+    except Exception:
+        leaderboard_data = []
 
     return JsonResponse({
         'status': 'success',

@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
+import shutil
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,12 +22,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-p2h+w1e)1bbv@(ddqea3w)^s53r@*b=i)r&rqk$%^nh82)e3bd'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-p2h+w1e)1bbv@(ddqea3w)^s53r@*b=i)r&rqk$%^nh82)e3bd'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 't')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.vercel.app',
+    'https://*.now.sh',
+]
 
 
 # Application definition
@@ -51,6 +61,13 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Enable WhiteNoise if installed
+try:
+    import whitenoise
+    MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+except ImportError:
+    pass
+
 ROOT_URLCONF = 'myproject.urls'
 
 TEMPLATES = [
@@ -74,10 +91,24 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+if os.environ.get('VERCEL'):
+    # On Vercel serverless, root filesystem is read-only.
+    # Copy existing database to /tmp to allow write operations (scores).
+    TMP_DB = Path('/tmp') / 'db.sqlite3'
+    ORIG_DB = BASE_DIR / 'db.sqlite3'
+    if ORIG_DB.exists() and not TMP_DB.exists():
+        try:
+            shutil.copy2(ORIG_DB, TMP_DB)
+        except Exception:
+            pass
+    DB_PATH = TMP_DB
+else:
+    DB_PATH = BASE_DIR / 'db.sqlite3'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': DB_PATH,
     }
 }
 
@@ -116,7 +147,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

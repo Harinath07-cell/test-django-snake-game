@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Static files collected during build
+staticfiles/
+
+# Virtual Environments
+venv/
+env/
+.venv/
+ENV/
+
+# Environment variables
+.env
+.env.*
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
